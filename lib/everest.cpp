@@ -42,7 +42,7 @@ Everest::Everest(std::string module_id_, const Config& config_, bool validate_da
     telemetry_enabled(telemetry_enabled) {
     BOOST_LOG_FUNCTION();
 
-    EVLOG_debug << "Initializing EVerest framework...";
+    EVLOG_info << "EVerest: Initializing EVerest framework...";
 
     const auto& main_config = this->config.get_main_config();
     const auto module_config_it = main_config.find(this->module_id);
@@ -64,6 +64,7 @@ Everest::Everest(std::string module_id_, const Config& config_, bool validate_da
         std::make_shared<TypedHandler>(HandlerType::ExternalMQTT, std::make_shared<Handler>(handle_ready_wrapper));
     this->mqtt_abstraction.register_handler(fmt::format("{}ready", mqtt_everest_prefix), everest_ready, QOS::QOS2);
 
+    this->publish_ocpp_user_config();
     this->publish_metadata();
 }
 
@@ -95,6 +96,18 @@ void Everest::heartbeat() {
         now << date::utc_clock::now();
         this->mqtt_abstraction.publish(heartbeat_topic, json(now.str()), QOS::QOS0);
         std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+}
+
+void Everest::publish_ocpp_user_config() {
+    BOOST_LOG_FUNCTION();
+
+    auto module_name = this->config.get_module_name(this->module_id);
+    if ("OCPP" == module_name) {
+
+        const auto user_config_topic = fmt::format("{}/user_config", this->config.mqtt_module_prefix(this->module_id));
+
+        this->mqtt_abstraction.publish(user_config_topic, this->config.get_appinstance_config(), QOS::QOS2);
     }
 }
 

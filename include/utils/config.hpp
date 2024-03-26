@@ -239,6 +239,10 @@ public:
     /// validator supporting uris
     ///
     static void format_checker(const std::string& format, const std::string& value);
+
+    /// @brief Return the appinstance config to caller
+    /// @return json object of the sent appinstance config
+    json get_appinstance_config();
 };
 } // namespace Everest
 

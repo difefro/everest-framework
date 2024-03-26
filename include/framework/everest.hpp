@@ -202,6 +202,7 @@ private:
     void heartbeat();
 
     void publish_metadata();
+    void publish_ocpp_user_config();
 
     static std::string check_args(const Arguments& func_args, json manifest_args);
     static bool check_arg(ArgumentType arg_types, json manifest_arg);

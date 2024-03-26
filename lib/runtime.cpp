@@ -78,7 +78,42 @@ void populate_module_info_path_from_runtime_settings(ModuleInfo& mi, std::shared
     mi.paths.share = rs->data_dir / defaults::MODULES_DIR / mi.name;
 }
 
-RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& config_) {
+void populate_module_info_appinstance_config_from_runtime_settings(ModuleInfo& mi, json ocpp_config) {
+    mi.appinstance_config = ocpp_config;
+}
+
+json create_userconfig_from_appinstance(json appinstance_config) {
+    json user_config;
+    // Internal object
+    user_config["Internal"]["ChargePointId"] = appinstance_config.at("ChargePointId");
+    user_config["Internal"]["CentralSystemURI"] = appinstance_config.at("CentralSystemURI");
+    user_config["Internal"]["ChargeBoxSerialNumber"] = appinstance_config.at("ChargeBoxSerialNumber");
+    // user_config["Internal"]["ChargePointModel"] = appinstance_config.at("ChargePointModel");
+    // user_config["Internal"]["ChargePointVendor"] = appinstance_config.at("ChargePointVendor");
+    // user_config["Internal"]["FirmwareVersion"] = appinstance_config.at("FirmwareVersion");
+
+    // Security object
+    user_config["Security"]["AuthorizationKey"] = appinstance_config.at("AuthorizationKey");
+    user_config["Security"]["SecurityProfile"] = appinstance_config.at("SecurityProfile");
+
+    return user_config;
+}
+
+RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& config_,
+                                 const std::string& appinstance_) {
+    if (appinstance_.length() != 0) {
+        try {
+            string_appinstance = appinstance_;
+            EVLOG_debug << "Parsing appinstance values ...";
+            appinstance = json::parse(appinstance_);
+        } catch (json::parse_error& ex) {
+            EVLOG_error << "Parse error at byte " << ex.byte;
+        }
+    } else {
+        EVLOG_debug << "No appinstance values sent, falling back to default values.";
+        appinstance = json::object();
+    }
+
     // if prefix or config is empty, we assume they have not been set!
     // if they have been set, check their validity, otherwise bail out!
 
@@ -274,9 +309,9 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
         mqtt_broker_socket_path = settings_mqtt_broker_socket_path->get<std::string>();
     }
 
-    const auto settings_mqtt_broker_host_it = settings.find("mqtt_broker_host");
-    if (settings_mqtt_broker_host_it != settings.end()) {
-        mqtt_broker_host = settings_mqtt_broker_host_it->get<std::string>();
+    const auto appinstance_mqtt_broker_host_it = appinstance.find("mqtt_broker_host");
+    if (appinstance_mqtt_broker_host_it != appinstance.end()) {
+        mqtt_broker_host = appinstance_mqtt_broker_host_it->get<std::string>();
         if (!mqtt_broker_socket_path.empty()) {
             // invalid configuration, can't have both UDS and IDS
             throw BootException(
@@ -301,9 +336,9 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
         }
     }
 
-    const auto settings_mqtt_broker_port_it = settings.find("mqtt_broker_port");
-    if (settings_mqtt_broker_port_it != settings.end()) {
-        mqtt_broker_port = settings_mqtt_broker_port_it->get<int>();
+    const auto appinstance_mqtt_broker_port_it = appinstance.find("mqtt_broker_port");
+    if (appinstance_mqtt_broker_port_it != appinstance.end()) {
+        mqtt_broker_port = appinstance_mqtt_broker_port_it->get<int>();
     } else {
         mqtt_broker_port = defaults::MQTT_BROKER_PORT;
     }
@@ -315,10 +350,13 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
         mqtt_broker_port = std::stoi(mqtt_server_port);
     }
 
-    const auto settings_mqtt_everest_prefix_it = settings.find("mqtt_everest_prefix");
-    if (settings_mqtt_everest_prefix_it != settings.end()) {
-        mqtt_everest_prefix = settings_mqtt_everest_prefix_it->get<std::string>();
+    const auto appinstance_mqtt_everest_prefix_it = appinstance.find("ChargePointId");
+    if (appinstance_mqtt_everest_prefix_it != appinstance.end()) {
+        mqtt_everest_prefix =
+            appinstance_mqtt_everest_prefix_it->get<std::string>() + "/" + defaults::MQTT_EVEREST_PREFIX;
     } else {
+        // FRO
+        EVLOG_debug << "ChargePointId missing, falling back to default mqtt-everest-prefix";
         mqtt_everest_prefix = defaults::MQTT_EVEREST_PREFIX;
     }
 
@@ -327,10 +365,13 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
         mqtt_everest_prefix = mqtt_everest_prefix += "/";
     }
 
-    const auto settings_mqtt_external_prefix_it = settings.find("mqtt_external_prefix");
-    if (settings_mqtt_external_prefix_it != settings.end()) {
-        mqtt_external_prefix = settings_mqtt_external_prefix_it->get<std::string>();
+    const auto appinstance_mqtt_external_prefix_it = appinstance.find("ChargePointId");
+    if (appinstance_mqtt_external_prefix_it != appinstance.end()) {
+        mqtt_external_prefix =
+            appinstance_mqtt_external_prefix_it->get<std::string>() + "/" + defaults::MQTT_EXTERNAL_PREFIX;
     } else {
+        // FRO
+        EVLOG_debug << "ChargePointId missing, falling back to default mqtt-external-prefix";
         mqtt_external_prefix = defaults::MQTT_EXTERNAL_PREFIX;
     }
 
@@ -407,6 +448,7 @@ int ModuleLoader::initialize() {
         }
         Logging::update_process_name(module_identifier);
 
+        // fro | seems like the interface for the everest instance module -> everest not relevant in starting the module
         auto everest = Everest(this->module_id, config, rs->validate_schema, rs->mqtt_broker_socket_path,
                                rs->mqtt_broker_host, rs->mqtt_broker_port, rs->mqtt_everest_prefix,
                                rs->mqtt_external_prefix, rs->telemetry_prefix, rs->telemetry_enabled);
@@ -511,6 +553,15 @@ int ModuleLoader::initialize() {
         populate_module_info_path_from_runtime_settings(module_info, rs);
         module_info.telemetry_enabled = everest.is_telemetry_enabled();
 
+        // FRO
+        if ("ocpp" == this->module_id) {
+            EVLOG_info << "Callbacks init happening. " << this->module_id;
+            auto ocpp_conf = create_userconfig_from_appinstance(rs->appinstance);
+            populate_module_info_appinstance_config_from_runtime_settings(module_info, ocpp_conf);
+        } else {
+            module_info.appinstance_config = nullptr;
+        }
+
         this->callbacks.init(module_configs, module_info);
 
         everest.spawn_main_loop_thread();
@@ -546,6 +597,7 @@ bool ModuleLoader::parse_command_line(int argc, char* argv[]) {
                        "Which module should be executed (module id from config file)");
     desc.add_options()("dontvalidateschema", "Don't validate json schema on every message");
     desc.add_options()("config", po::value<std::string>(), "The path to a custom config.json");
+    desc.add_options()("appinstance", po::value<std::string>(), "Json string with instance parameters.");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -558,7 +610,8 @@ bool ModuleLoader::parse_command_line(int argc, char* argv[]) {
 
     const auto prefix_opt = parse_string_option(vm, "prefix");
     const auto config_opt = parse_string_option(vm, "config");
-    this->runtime_settings = std::make_unique<RuntimeSettings>(prefix_opt, config_opt);
+    const auto appinstance_opt = parse_string_option(vm, "appinstance");
+    this->runtime_settings = std::make_unique<RuntimeSettings>(prefix_opt, config_opt, appinstance_opt);
     this->original_process_name = argv[0];
 
     if (vm.count("module") != 0) {

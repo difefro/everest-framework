@@ -9,7 +9,7 @@
 
 class RuntimeSession {
 public:
-    RuntimeSession(const std::string& prefix, const std::string& config_file);
+    RuntimeSession(const std::string& prefix, const std::string& config_file, const std::string& appinstance);
 
     RuntimeSession();
 
