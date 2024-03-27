@@ -115,6 +115,11 @@ static Napi::Value setup_cmd_handler(const std::string& impl_id, const std::stri
     return env.Undefined();
 }
 
+/// @brief
+/// @param req
+/// @param var_name
+/// @param info
+/// @return
 static Napi::Value set_var_subscription_handler(const Requirement& req, const std::string& var_name,
                                                 const Napi::CallbackInfo& info) {
     BOOST_LOG_FUNCTION();
@@ -204,7 +209,6 @@ static Napi::Value mqtt_subscribe(const Napi::CallbackInfo& info) {
     BOOST_LOG_FUNCTION();
 
     const auto& env = info.Env();
-
     try {
         const auto& topic_alias = info[0].ToString().Utf8Value();
         const auto& handler = info[1].As<Napi::Function>();
@@ -392,8 +396,9 @@ static Napi::Value boot_module(const Napi::CallbackInfo& info) {
         const auto& prefix = settings.Get("prefix").ToString().Utf8Value();
         const auto& config_file = settings.Get("config_file").ToString().Utf8Value();
         const bool validate_schema = settings.Get("validate_schema").ToBoolean().Value();
+        const auto& appinstance = settings.Get("appinstance").ToString().Utf8Value();
 
-        auto rs = std::make_shared<Everest::RuntimeSettings>(prefix, config_file);
+        auto rs = std::make_shared<Everest::RuntimeSettings>(prefix, config_file, appinstance);
 
         // initialize logging as early as possible
         Everest::Logging::init(rs->logging_config_file, module_id);

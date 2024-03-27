@@ -121,14 +121,18 @@ struct RuntimeSettings {
     std::string run_as_user;
 
     nlohmann::json config;
+    nlohmann::json appinstance;
+    std::string string_appinstance;
 
     bool validate_schema;
 
-    explicit RuntimeSettings(const std::string& prefix, const std::string& config);
+    explicit RuntimeSettings(const std::string& prefix, const std::string& config, const std::string& appinstance);
+    json create_userconfig_from_appinstance(json appinstance_config);
 };
 
 // NOTE: this function needs the be called with a pre-initialized ModuleInfo struct
 void populate_module_info_path_from_runtime_settings(ModuleInfo&, std::shared_ptr<RuntimeSettings> rs);
+void populate_module_info_appinstance_config_from_runtime_settings(ModuleInfo& mi, std::shared_ptr<RuntimeSettings> rs);
 
 struct ModuleCallbacks {
     std::function<void(ModuleAdapter module_adapter)> register_module_adapter;

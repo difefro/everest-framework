@@ -76,7 +76,8 @@ private:
 
 // Helper struct keeping information on how to start module
 struct ModuleStartInfo {
-    enum class Language {
+    enum class Language
+    {
         cpp,
         javascript,
         python
@@ -112,7 +113,8 @@ static void exec_cpp_module(system::SubProcess& proc_handle, const ModuleStartIn
                             std::shared_ptr<RuntimeSettings> rs) {
     const auto exec_binary = module_info.path.c_str();
     std::vector<std::string> arguments = {module_info.printable_name, "--prefix", rs->prefix.string(), "--conf",
-                                          rs->config_file.string(),   "--module", module_info.name};
+                                          rs->config_file.string(),   "--module", module_info.name,    "--appinstance",
+                                          rs->string_appinstance};
 
     auto argv_list = arguments_to_exec_argv(arguments);
     execv(exec_binary, argv_list.data());
@@ -134,6 +136,7 @@ static void exec_javascript_module(system::SubProcess& proc_handle, const Module
     setenv("EV_MODULE", module_info.name.c_str(), 1);
     setenv("EV_PREFIX", rs->prefix.c_str(), 0);
     setenv("EV_CONF_FILE", rs->config_file.c_str(), 0);
+    setenv("FRO_PREFIX", rs->string_appinstance.c_str(), 1);
 
     if (rs->validate_schema) {
         setenv("EV_VALIDATE_SCHEMA", "1", 1);
@@ -145,12 +148,9 @@ static void exec_javascript_module(system::SubProcess& proc_handle, const Module
 
     const auto node_binary = "node";
 
-    std::vector<std::string> arguments = {
-        "node",
-        "--unhandled-rejections=strict",
-        module_info.path.string(),
-    };
+    std::vector<std::string> arguments = {"node", "--unhandled-rejections=strict", module_info.path.string()};
 
+    EVLOG_info << "Some Js is about to be executed. " << module_info.path.string();
     auto argv_list = arguments_to_exec_argv(arguments);
     execvp(node_binary, argv_list.data());
 
@@ -220,7 +220,7 @@ static std::map<pid_t, std::string> spawn_modules(const std::vector<ModuleStartI
 
         if (proc_handle.is_child()) {
             // first, check if we need any capabilities
-
+            EVLOG_debug << "Spawning module: " << module.name;
             try {
                 exec_module(rs, module, proc_handle);
             } catch (const std::exception& err) {
@@ -362,15 +362,15 @@ static std::map<pid_t, std::string> start_modules(Config& config, MQTTAbstractio
         auto python_module_path = module_path / python_filename;
 
         if (fs::exists(binary_path)) {
-            EVLOG_debug << fmt::format("module: {} ({}) provided as binary", module_name, module_type);
+            EVLOG_verbose << fmt::format("module: {} ({}) provided as binary", module_name, module_type);
             modules_to_spawn.emplace_back(module_name, printable_module_name, ModuleStartInfo::Language::cpp,
                                           binary_path, capabilities);
         } else if (fs::exists(javascript_library_path)) {
-            EVLOG_debug << fmt::format("module: {} ({}) provided as javascript library", module_name, module_type);
+            EVLOG_info << fmt::format("module: {} ({}) provided as javascript library", module_name, module_type);
             modules_to_spawn.emplace_back(module_name, printable_module_name, ModuleStartInfo::Language::javascript,
                                           fs::canonical(javascript_library_path), capabilities);
         } else if (fs::exists(python_module_path)) {
-            EVLOG_verbose << fmt::format("module: {} ({}) provided as python module", module_name, module_type);
+            EVLOG_info << fmt::format("module: {} ({}) provided as python module", module_name, module_type);
             modules_to_spawn.emplace_back(module_name, printable_module_name, ModuleStartInfo::Language::python,
                                           fs::canonical(python_module_path), capabilities);
         } else {
@@ -479,8 +479,9 @@ int boot(const po::variables_map& vm) {
 
     const auto prefix_opt = parse_string_option(vm, "prefix");
     const auto config_opt = parse_string_option(vm, "config");
+    const auto appinstance_opt = parse_string_option(vm, "appinstance");
 
-    std::shared_ptr<RuntimeSettings> rs = std::make_shared<RuntimeSettings>(prefix_opt, config_opt);
+    std::shared_ptr<RuntimeSettings> rs = std::make_shared<RuntimeSettings>(prefix_opt, config_opt, appinstance_opt);
 
     Logging::init(rs->logging_config_file.string());
 
@@ -503,6 +504,8 @@ int boot(const po::variables_map& vm) {
     if (not rs->run_as_user.empty()) {
         EVLOG_info << "EVerest will run as system user: " << rs->run_as_user;
     }
+    EVLOG_info << "EVerest MQTT prefix: " << rs->mqtt_everest_prefix;
+    EVLOG_info << "External MQTT prefix: " << rs->mqtt_external_prefix;
 
 #ifdef ENABLE_ADMIN_PANEL
     auto controller_handle = start_controller(rs);
@@ -592,6 +595,7 @@ int boot(const po::variables_map& vm) {
     // create StatusFifo object
     auto status_fifo = StatusFifo::create_from_path(vm["status-fifo"].as<std::string>());
 
+    // Fro - TODO: enable possibility to connect to encrypted broker (usr + pwd)
     auto mqtt_abstraction =
         MQTTAbstraction(rs->mqtt_broker_socket_path, rs->mqtt_broker_host, std::to_string(rs->mqtt_broker_port),
                         rs->mqtt_everest_prefix, rs->mqtt_external_prefix);
@@ -760,6 +764,7 @@ int main(int argc, char* argv[]) {
                        "looked up in the default config directory");
     desc.add_options()("status-fifo", po::value<std::string>()->default_value(""),
                        "Path to a named pipe, that shall be used for status updates from the manager");
+    desc.add_options()("appinstance", po::value<std::string>(), "Json config to start separate instances of EVerest.");
 
     po::variables_map vm;
 

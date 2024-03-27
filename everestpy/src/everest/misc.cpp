@@ -23,11 +23,14 @@ static std::string get_ev_conf_file_from_env() {
     return config_file;
 }
 
-RuntimeSession::RuntimeSession(const std::string& prefix, const std::string& config_file) :
-    rs(std::make_shared<Everest::RuntimeSettings>(prefix, config_file)), config(create_config_instance(rs)) {
+RuntimeSession::RuntimeSession(const std::string& prefix, const std::string& config_file,
+                               const std::string& appinstance) :
+    rs(std::make_shared<Everest::RuntimeSettings>(prefix, config_file, appinstance)),
+    config(create_config_instance(rs)) {
+    EVLOG_info << "RuntimeSession started.";
 }
 
-RuntimeSession::RuntimeSession() : RuntimeSession(get_ev_prefix_from_env(), get_ev_conf_file_from_env()) {
+RuntimeSession::RuntimeSession() : RuntimeSession(get_ev_prefix_from_env(), get_ev_conf_file_from_env(), "") {
 }
 
 std::unique_ptr<Everest::Config> RuntimeSession::create_config_instance(std::shared_ptr<Everest::RuntimeSettings> rs) {

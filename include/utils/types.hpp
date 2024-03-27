@@ -33,7 +33,8 @@ using Object = json::object_t;
 using Handler = std::function<void(json)>;
 using StringHandler = std::function<void(std::string)>;
 
-enum class HandlerType {
+enum class HandlerType
+{
     Call,
     Result,
     SubscribeVar,
@@ -58,7 +59,8 @@ struct TypedHandler {
 using Token = std::shared_ptr<TypedHandler>;
 
 /// \brief MQTT Quality of service
-enum class QOS {
+enum class QOS
+{
     QOS0, ///< At most once delivery
     QOS1, ///< At least once delivery
     QOS2  ///< Exactly once delivery
@@ -78,6 +80,8 @@ struct ModuleInfo {
     Paths paths;
     bool telemetry_enabled;
     bool global_errors_enabled;
+    // FRO
+    json appinstance_config;
 };
 
 struct TelemetryConfig {
