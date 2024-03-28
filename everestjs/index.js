@@ -24,6 +24,9 @@ const helpers = {
   },
 };
 
+//
+// Fro - get instance config from environment var set in (manager::)exec_javascript_module()
+//
 const EverestModule = function EverestModule(handler_setup, user_settings) {
   const env_settings = {
     module: process.env.EV_MODULE,
@@ -41,6 +44,9 @@ const EverestModule = function EverestModule(handler_setup, user_settings) {
     throw new Error('parameter "module" is missing');
   }
 
+  //
+  // Fro - move instance config into config struct
+  //
   const config = {
     module: settings.module,
     prefix: settings.prefix,

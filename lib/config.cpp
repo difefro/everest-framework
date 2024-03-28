@@ -20,8 +20,7 @@ namespace Everest {
 
 class ConfigParseException : public std::exception {
 public:
-    enum ParseErrorType
-    {
+    enum ParseErrorType {
         NOT_DEFINED,
         MISSING_ENTRY,
         SCHEMA
@@ -1116,6 +1115,9 @@ void Config::resolve_all_requirements() {
     EVLOG_debug << "All module requirements resolved successfully...";
 }
 
+//
+// Fro - return the instance config member from RuntimeSettings
+//
 json Config::get_appinstance_config() {
     BOOST_LOG_FUNCTION();
 

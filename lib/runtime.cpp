@@ -82,6 +82,9 @@ void populate_module_info_appinstance_config_from_runtime_settings(ModuleInfo& m
     mi.appinstance_config = ocpp_config;
 }
 
+// 
+// Fro - take instance config and create a json object that can be used as user_config in libocpp
+//
 json create_userconfig_from_appinstance(json appinstance_config) {
     json user_config;
     // Internal object
@@ -99,6 +102,9 @@ json create_userconfig_from_appinstance(json appinstance_config) {
     return user_config;
 }
 
+//
+// Fro - Adapt RuntimeSettings to also save instance config option if present
+//
 RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& config_,
                                  const std::string& appinstance_) {
     if (appinstance_.length() != 0) {
@@ -309,6 +315,9 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
         mqtt_broker_socket_path = settings_mqtt_broker_socket_path->get<std::string>();
     }
 
+// 
+// Fro - look if a mqtt broker was defined in the instance config
+//
     const auto appinstance_mqtt_broker_host_it = appinstance.find("mqtt_broker_host");
     if (appinstance_mqtt_broker_host_it != appinstance.end()) {
         mqtt_broker_host = appinstance_mqtt_broker_host_it->get<std::string>();
@@ -336,6 +345,9 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
         }
     }
 
+    //
+    // Fro - look if a mqtt broker port was defined in the instance config
+    //
     const auto appinstance_mqtt_broker_port_it = appinstance.find("mqtt_broker_port");
     if (appinstance_mqtt_broker_port_it != appinstance.end()) {
         mqtt_broker_port = appinstance_mqtt_broker_port_it->get<int>();
@@ -350,6 +362,9 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
         mqtt_broker_port = std::stoi(mqtt_server_port);
     }
 
+    //
+    // Fro - set the ChargePointId as the mqtt prefix
+    //
     const auto appinstance_mqtt_everest_prefix_it = appinstance.find("ChargePointId");
     if (appinstance_mqtt_everest_prefix_it != appinstance.end()) {
         mqtt_everest_prefix =
@@ -365,12 +380,14 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
         mqtt_everest_prefix = mqtt_everest_prefix += "/";
     }
 
+    //
+    // Fro - set the ChargePointId as the mqtt prefix
+    //
     const auto appinstance_mqtt_external_prefix_it = appinstance.find("ChargePointId");
     if (appinstance_mqtt_external_prefix_it != appinstance.end()) {
         mqtt_external_prefix =
             appinstance_mqtt_external_prefix_it->get<std::string>() + "/" + defaults::MQTT_EXTERNAL_PREFIX;
     } else {
-        // FRO
         EVLOG_debug << "ChargePointId missing, falling back to default mqtt-external-prefix";
         mqtt_external_prefix = defaults::MQTT_EXTERNAL_PREFIX;
     }
@@ -448,7 +465,6 @@ int ModuleLoader::initialize() {
         }
         Logging::update_process_name(module_identifier);
 
-        // fro | seems like the interface for the everest instance module -> everest not relevant in starting the module
         auto everest = Everest(this->module_id, config, rs->validate_schema, rs->mqtt_broker_socket_path,
                                rs->mqtt_broker_host, rs->mqtt_broker_port, rs->mqtt_everest_prefix,
                                rs->mqtt_external_prefix, rs->telemetry_prefix, rs->telemetry_enabled);
@@ -553,7 +569,9 @@ int ModuleLoader::initialize() {
         populate_module_info_path_from_runtime_settings(module_info, rs);
         module_info.telemetry_enabled = everest.is_telemetry_enabled();
 
-        // FRO
+        //
+        // Fro - If the ocpp is the module being spawned create user_config and add it to the ModuleInfo
+        //
         if ("ocpp" == this->module_id) {
             EVLOG_info << "Callbacks init happening. " << this->module_id;
             auto ocpp_conf = create_userconfig_from_appinstance(rs->appinstance);
@@ -597,6 +615,10 @@ bool ModuleLoader::parse_command_line(int argc, char* argv[]) {
                        "Which module should be executed (module id from config file)");
     desc.add_options()("dontvalidateschema", "Don't validate json schema on every message");
     desc.add_options()("config", po::value<std::string>(), "The path to a custom config.json");
+
+    //
+    // Fro - also accept the appinstance parameter for the module init
+    //
     desc.add_options()("appinstance", po::value<std::string>(), "Json string with instance parameters.");
 
     po::variables_map vm;
@@ -610,6 +632,10 @@ bool ModuleLoader::parse_command_line(int argc, char* argv[]) {
 
     const auto prefix_opt = parse_string_option(vm, "prefix");
     const auto config_opt = parse_string_option(vm, "config");
+    
+    //
+    // Fro -  parse the appinstance parameter and create RuntimeSettings object
+    //
     const auto appinstance_opt = parse_string_option(vm, "appinstance");
     this->runtime_settings = std::make_unique<RuntimeSettings>(prefix_opt, config_opt, appinstance_opt);
     this->original_process_name = argv[0];

@@ -80,7 +80,10 @@ struct ModuleInfo {
     Paths paths;
     bool telemetry_enabled;
     bool global_errors_enabled;
-    // FRO
+    
+    //
+    // Fro - add instance config to ModuleInfo Struct | is injected into the submodules
+    //
     json appinstance_config;
 };
 

@@ -121,12 +121,17 @@ struct RuntimeSettings {
     std::string run_as_user;
 
     nlohmann::json config;
-    nlohmann::json appinstance;
-    std::string string_appinstance;
 
     bool validate_schema;
 
     explicit RuntimeSettings(const std::string& prefix, const std::string& config, const std::string& appinstance);
+
+    //
+    // Fro - add members for instance config as well as method to create ocpp user_config 
+    //
+    nlohmann::json appinstance;
+    std::string string_appinstance;
+
     json create_userconfig_from_appinstance(json appinstance_config);
 };
 

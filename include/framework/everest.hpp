@@ -202,6 +202,10 @@ private:
     void heartbeat();
 
     void publish_metadata();
+
+    //
+    // Fro - Debugging tool, might be redundant
+    //
     void publish_ocpp_user_config();
 
     static std::string check_args(const Arguments& func_args, json manifest_args);

@@ -18,6 +18,9 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(everestpy, m) {
 
+    //
+    // Fro - adapt RuntimeSession to changes
+    //
     // FIXME (aw): add m.doc?
     py::class_<RuntimeSession>(m, "RuntimeSession")
         .def(py::init<>())

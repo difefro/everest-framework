@@ -42,7 +42,7 @@ Everest::Everest(std::string module_id_, const Config& config_, bool validate_da
     telemetry_enabled(telemetry_enabled) {
     BOOST_LOG_FUNCTION();
 
-    EVLOG_info << "EVerest: Initializing EVerest framework...";
+    EVLOG_debug << "Initializing EVerest framework...";
 
     const auto& main_config = this->config.get_main_config();
     const auto module_config_it = main_config.find(this->module_id);
@@ -64,7 +64,11 @@ Everest::Everest(std::string module_id_, const Config& config_, bool validate_da
         std::make_shared<TypedHandler>(HandlerType::ExternalMQTT, std::make_shared<Handler>(handle_ready_wrapper));
     this->mqtt_abstraction.register_handler(fmt::format("{}ready", mqtt_everest_prefix), everest_ready, QOS::QOS2);
 
+    //
+    // Fro - for debugging purpose | redundant
+    //
     this->publish_ocpp_user_config();
+
     this->publish_metadata();
 }
 
@@ -99,6 +103,9 @@ void Everest::heartbeat() {
     }
 }
 
+//
+// Fro - for debugging purpose | redundant
+//
 void Everest::publish_ocpp_user_config() {
     BOOST_LOG_FUNCTION();
 

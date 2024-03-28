@@ -23,6 +23,9 @@ static std::string get_ev_conf_file_from_env() {
     return config_file;
 }
 
+//
+// Fro - adapt function to fit new RuntimeSettings() definition
+//
 RuntimeSession::RuntimeSession(const std::string& prefix, const std::string& config_file,
                                const std::string& appinstance) :
     rs(std::make_shared<Everest::RuntimeSettings>(prefix, config_file, appinstance)),
@@ -30,6 +33,9 @@ RuntimeSession::RuntimeSession(const std::string& prefix, const std::string& con
     EVLOG_info << "RuntimeSession started.";
 }
 
+//
+// Fro - in this case just use empty String for intance config
+//
 RuntimeSession::RuntimeSession() : RuntimeSession(get_ev_prefix_from_env(), get_ev_conf_file_from_env(), "") {
 }
 

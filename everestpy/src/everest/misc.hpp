@@ -9,6 +9,9 @@
 
 class RuntimeSession {
 public:
+    //
+    // Fro - Adapt this funtion to fit new RuntimeSettings() definition
+    //
     RuntimeSession(const std::string& prefix, const std::string& config_file, const std::string& appinstance);
 
     RuntimeSession();
