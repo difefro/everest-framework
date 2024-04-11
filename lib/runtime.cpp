@@ -87,11 +87,10 @@ void populate_module_info_appinstance_config_from_runtime_settings(ModuleInfo& m
 //
 json create_userconfig_from_appinstance(json appinstance_config) {
     json user_config;
-    std::string node_id = appinstance_config.at("ChargePointId");
     // Internal object
-    user_config["Internal"]["ChargePointId"] = node_id;
+    user_config["Internal"]["ChargePointId"] = appinstance_config.at("ChargePointId");
     user_config["Internal"]["CentralSystemURI"] = appinstance_config.at("CentralSystemURI");
-    user_config["Internal"]["ChargeBoxSerialNumber"] = node_id.substr(0, 25);
+    user_config["Internal"]["ChargeBoxSerialNumber"] = appinstance_config.at("NodeId").substr(0, 25);
 
     // Security object
     user_config["Security"]["AuthorizationKey"] = appinstance_config.at("AuthorizationKey");
@@ -363,7 +362,7 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
     //
     // Fro - set the ChargePointId as the mqtt prefix
     //
-    const auto appinstance_mqtt_everest_prefix_it = appinstance.find("ChargePointId");
+    const auto appinstance_mqtt_everest_prefix_it = appinstance.find("NodeId");
     if (appinstance_mqtt_everest_prefix_it != appinstance.end()) {
         mqtt_everest_prefix =
             appinstance_mqtt_everest_prefix_it->get<std::string>() + "/" + defaults::MQTT_EVEREST_PREFIX;
@@ -381,7 +380,7 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
     //
     // Fro - set the ChargePointId as the mqtt prefix
     //
-    const auto appinstance_mqtt_external_prefix_it = appinstance.find("ChargePointId");
+    const auto appinstance_mqtt_external_prefix_it = appinstance.find("NodeId");
     if (appinstance_mqtt_external_prefix_it != appinstance.end()) {
         mqtt_external_prefix =
             appinstance_mqtt_external_prefix_it->get<std::string>() + "/" + defaults::MQTT_EXTERNAL_PREFIX;
