@@ -87,10 +87,11 @@ void populate_module_info_appinstance_config_from_runtime_settings(ModuleInfo& m
 //
 json create_userconfig_from_appinstance(json appinstance_config) {
     json user_config;
+    std::string nodeid = appinstance_config.at("NodeId");
     // Internal object
     user_config["Internal"]["ChargePointId"] = appinstance_config.at("ChargePointId");
     user_config["Internal"]["CentralSystemURI"] = appinstance_config.at("CentralSystemURI");
-    user_config["Internal"]["ChargeBoxSerialNumber"] = appinstance_config.at("NodeId").substr(0, 25);
+    user_config["Internal"]["ChargeBoxSerialNumber"] = nodeid.substr(0, 25);
 
     // Security object
     user_config["Security"]["AuthorizationKey"] = appinstance_config.at("AuthorizationKey");
