@@ -1,3 +1,13 @@
+///
+/// \file        runtime.hpp
+/// \author      Felix Dilly
+/// \date        Created at: 2024-04-11
+/// \date        Last modified at: 2024-04-12
+/// ---
+/// \copyright   Copyright 2024 Fronius International GmbH.
+///              https://www.fronius.com
+///
+
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 - 2023 Pionix GmbH and Contributors to EVerest
 #ifndef FRAMEWORK_EVEREST_RUNTIME_HPP
@@ -127,12 +137,13 @@ struct RuntimeSettings {
     explicit RuntimeSettings(const std::string& prefix, const std::string& config, const std::string& appinstance);
 
     //
-    // Fro - add members for instance config as well as method to create ocpp user_config 
+    // Fro - add members for instance config as well as method to create ocpp user_config
     //
     nlohmann::json appinstance;
     std::string string_appinstance;
 
     json create_userconfig_from_appinstance(json appinstance_config);
+    std::string parse_phase_rotation_string(json phase_rotation);
 };
 
 // NOTE: this function needs the be called with a pre-initialized ModuleInfo struct

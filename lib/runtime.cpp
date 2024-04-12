@@ -1,3 +1,13 @@
+///
+/// \file        runtime.cpp
+/// \author      Felix Dilly
+/// \date        Created at: 2024-04-11
+/// \date        Last modified at: 2024-04-12
+/// ---
+/// \copyright   Copyright 2024 Fronius International GmbH.
+///              https://www.fronius.com
+///
+
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 - 2023 Pionix GmbH and Contributors to EVerest
 
@@ -82,7 +92,23 @@ void populate_module_info_appinstance_config_from_runtime_settings(ModuleInfo& m
     mi.appinstance_config = ocpp_config;
 }
 
-// 
+std::string parse_phase_rotation_string(json phase_rotation) {
+    std::string configRotation;
+    int tmp = 0;
+    for (auto& phase_config : phase_rotation.items()) {
+        tmp++;
+        std::string rotationKey = phase_config.key();
+        std::string rotationValue = phase_config.value();
+        configRotation += rotationKey + "." + rotationValue;
+        if (tmp != phase_rotation.size()) {
+            configRotation += ",";
+        }
+    }
+
+    return configRotation;
+}
+
+//
 // Fro - take instance config and create a json object that can be used as user_config in libocpp
 //
 json create_userconfig_from_appinstance(json appinstance_config) {
@@ -92,6 +118,10 @@ json create_userconfig_from_appinstance(json appinstance_config) {
     user_config["Internal"]["ChargePointId"] = appinstance_config.at("ChargePointId");
     user_config["Internal"]["CentralSystemURI"] = appinstance_config.at("CentralSystemURI");
     user_config["Internal"]["ChargeBoxSerialNumber"] = nodeid.substr(0, 25);
+    user_config["Internal"]["VerifyCsmsCommonName"] = appinstance_config.at("VerifyCert");
+
+    // Core object
+    user_config["Core"]["ConnectorPhaseRotation"] = parse_phase_rotation_string(appinstance_config.at("PhaseRotation"));
 
     // Security object
     user_config["Security"]["AuthorizationKey"] = appinstance_config.at("AuthorizationKey");
@@ -108,7 +138,6 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
     if (appinstance_.length() != 0) {
         try {
             string_appinstance = appinstance_;
-            EVLOG_debug << "Parsing appinstance values ...";
             appinstance = json::parse(appinstance_);
         } catch (json::parse_error& ex) {
             EVLOG_error << "Parse error at byte " << ex.byte;
@@ -313,9 +342,9 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
         mqtt_broker_socket_path = settings_mqtt_broker_socket_path->get<std::string>();
     }
 
-// 
-// Fro - look if a mqtt broker was defined in the instance config
-//
+    //
+    // Fro - look if a mqtt broker was defined in the instance config
+    //
     const auto appinstance_mqtt_broker_host_it = appinstance.find("mqtt_broker_host");
     if (appinstance_mqtt_broker_host_it != appinstance.end()) {
         mqtt_broker_host = appinstance_mqtt_broker_host_it->get<std::string>();
@@ -630,7 +659,7 @@ bool ModuleLoader::parse_command_line(int argc, char* argv[]) {
 
     const auto prefix_opt = parse_string_option(vm, "prefix");
     const auto config_opt = parse_string_option(vm, "config");
-    
+
     //
     // Fro -  parse the appinstance parameter and create RuntimeSettings object
     //
