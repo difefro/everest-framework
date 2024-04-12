@@ -114,19 +114,40 @@ std::string parse_phase_rotation_string(json phase_rotation) {
 json create_userconfig_from_appinstance(json appinstance_config) {
     json user_config;
     std::string nodeid = appinstance_config.at("NodeId");
+    // Required objects
     // Internal object
     user_config["Internal"]["ChargePointId"] = appinstance_config.at("ChargePointId");
     user_config["Internal"]["CentralSystemURI"] = appinstance_config.at("CentralSystemURI");
     user_config["Internal"]["ChargeBoxSerialNumber"] = nodeid.substr(0, 25);
-    user_config["Internal"]["VerifyCsmsCommonName"] = appinstance_config.at("VerifyCert");
-
-    // Core object
-    user_config["Core"]["ConnectorPhaseRotation"] = parse_phase_rotation_string(appinstance_config.at("PhaseRotation"));
-
     // Security object
     user_config["Security"]["AuthorizationKey"] = appinstance_config.at("AuthorizationKey");
-    user_config["Security"]["SecurityProfile"] = appinstance_config.at("SecurityProfile");
 
+    // Optional objects
+    // Internal obejct
+    if (appinstance_config.find("VerifyCert") != appinstance_config.end()) {
+        user_config["Internal"]["VerifyCsmsCommonName"] = appinstance_config.at("VerifyCert");
+    } else {
+        user_config["Internal"]["VerifyCsmsCommonName"] = true;
+    }
+    // Core object
+    if (appinstance_config.find("PhaseRotation") != appinstance_config.end()) {
+        user_config["Core"]["ConnectorPhaseRotation"] =
+            parse_phase_rotation_string(appinstance_config.at("PhaseRotation"));
+    } else {
+        std::string phase_rotations;
+        for (int iterator = 0; iterator < appinstance_config.at("ConnectorCount"); iterator++) {
+            phase_rotations += fmt::format("{}.RST", iterator);
+            if (iterator + 1 < appinstance_config.at("ConnectorCount")) {
+                phase_rotations += ",";
+            }
+        }
+    }
+    // Security object
+    if (appinstance_config.find("SecurityProfile") != appinstance_config.end()) {
+        user_config["Security"]["SecurityProfile"] = appinstance_config.at("SecurityProfile");
+    } else {
+        user_config["Security"]["SecurityProfile"] = 2;
+    }
     return user_config;
 }
 
