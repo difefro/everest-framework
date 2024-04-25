@@ -1,3 +1,13 @@
+///
+/// \file        manager.cpp
+/// \author      Felix Dilly
+/// \date        Created at: 2024-04-15
+/// \date        Last modified at: 2024-04-25
+/// ---
+/// \copyright   Copyright 2024 Fronius International GmbH.
+///              https://www.fronius.com
+///
+
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2020 - 2023 Pionix GmbH and Contributors to EVerest
 
@@ -6,6 +16,7 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <thread>
 
@@ -46,6 +57,7 @@ using namespace Everest;
 const auto PARENT_DIED_SIGNAL = SIGTERM;
 const int CONTROLLER_IPC_READ_TIMEOUT_MS = 50;
 auto complete_start_time = std::chrono::system_clock::now();
+std::map<pid_t, std::string> module_handles;
 
 #ifdef ENABLE_ADMIN_PANEL
 class ControllerHandle {
@@ -76,7 +88,8 @@ private:
 
 // Helper struct keeping information on how to start module
 struct ModuleStartInfo {
-    enum class Language {
+    enum class Language
+    {
         cpp,
         javascript,
         python
@@ -408,8 +421,11 @@ static void shutdown_modules(const std::map<pid_t, std::string>& modules, Config
         modules_ready.clear();
     }
 
+    int stat;
     for (const auto& child : modules) {
         auto retval = kill(child.first, SIGTERM);
+        waitpid(child.first, &stat, 0);
+
         // FIXME (aw): supply errno strings
         if (retval != 0) {
             EVLOG_critical << fmt::format("SIGTERM of child: {} (pid: {}) {}: {}. Escalating to SIGKILL", child.second,
@@ -426,6 +442,21 @@ static void shutdown_modules(const std::map<pid_t, std::string>& modules, Config
             EVLOG_info << fmt::format("SIGTERM of child: {} (pid: {}) {}.", child.second, child.first,
                                       fmt::format(TERMINAL_STYLE_OK, "succeeded"));
         }
+    }
+}
+
+void signal_handler(int signum) {
+    std::mutex exitMutex;
+
+    int stat;
+    for (auto child : module_handles) {
+        EVLOG_info << "Killing child " << child.first << "\n";
+        kill(child.first, SIGTERM);
+        waitpid(child.first, &stat, 0);
+    }
+
+    if (exitMutex.try_lock()) {
+        std::exit(0);
     }
 }
 
@@ -646,7 +677,7 @@ int boot(const po::variables_map& vm) {
     error::ErrorCommBridge err_comm_bridge = error::ErrorCommBridge(
         err_manager, send_json_message, register_call_handler, register_error_handler, request_clear_error_topic);
 
-    auto module_handles =
+    module_handles =
         start_modules(*config, mqtt_abstraction, ignored_modules, standalone_modules, rs, status_fifo, err_comm_bridge);
     bool modules_started = true;
     bool restart_modules = false;
@@ -782,6 +813,10 @@ int main(int argc, char* argv[]) {
     desc.add_options()("appinstance", po::value<std::string>(), "Json config to start separate instances of EVerest.");
 
     po::variables_map vm;
+
+    // shutdown handler
+    (void)signal(SIGTERM, signal_handler);
+    (void)signal(SIGKILL, signal_handler);
 
     try {
         po::store(po::parse_command_line(argc, argv, desc), vm);
