@@ -117,7 +117,7 @@ json create_userconfig_from_appinstance(json appinstance_config) {
     // Required objects
     // Internal object
     user_config["Internal"]["ChargePointId"] = appinstance_config.at("ChargePointId");
-    user_config["Internal"]["CentralSystemURI"] = appinstance_config.at("CentralSystemURI");
+    user_config["Internal"]["CentralSystemURI"] = appinstance_config.at("CentralSystemUri");
     user_config["Internal"]["ChargeBoxSerialNumber"] = nodeid.substr(0, 25);
     // Security object
     user_config["Security"]["AuthorizationKey"] = appinstance_config.at("AuthorizationKey");
