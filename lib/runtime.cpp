@@ -2,7 +2,7 @@
 /// \file        runtime.cpp
 /// \author      Felix Dilly
 /// \date        Created at: 2024-04-11
-/// \date        Last modified at: 2024-04-12
+/// \date        Last modified at: 2024-05-14
 /// ---
 /// \copyright   Copyright 2024 Fronius International GmbH.
 ///              https://www.fronius.com
@@ -262,6 +262,13 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
             assert_dir((prefix / defaults::DATAROOT_DIR / defaults::NAMESPACE).string(), "Default share directory");
     }
 
+    //
+    // Fro
+    //
+    deployment_name = std::string(std::getenv("DEPLOYMENT_NAME"));
+    app_name = std::string(std::getenv("APP_VERSION"));
+    app_version = std::string(std::getenv("APP_VERSION"));
+
     const auto settings_configs_dir_it = settings.find("configs_dir");
     if (settings_configs_dir_it != settings.end()) {
         auto settings_configs_dir = get_prefixed_path_from_json(*settings_configs_dir_it, prefix);
@@ -411,33 +418,16 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
     }
 
     //
-    // Fro - set the ChargePointId as the mqtt prefix
+    // Fro - set the NodeId and use it as mqtt prefix
     //
-    const auto appinstance_mqtt_everest_prefix_it = appinstance.find("NodeId");
-    if (appinstance_mqtt_everest_prefix_it != appinstance.end()) {
-        mqtt_everest_prefix =
-            appinstance_mqtt_everest_prefix_it->get<std::string>() + "/" + defaults::MQTT_EVEREST_PREFIX;
+    auto it_node_id = appinstance.find("NodeId");
+    if (it_node_id != appinstance.end()) {
+        node_id = it_node_id->get<std::string>();
+        mqtt_everest_prefix = node_id + "/" + defaults::MQTT_EVEREST_PREFIX + "/";
+        mqtt_external_prefix = node_id + "/" + defaults::MQTT_EXTERNAL_PREFIX + "/";
     } else {
-        // FRO
-        EVLOG_debug << "ChargePointId missing, falling back to default mqtt-everest-prefix";
-        mqtt_everest_prefix = defaults::MQTT_EVEREST_PREFIX;
-    }
-
-    // always make sure the everest mqtt prefix ends with '/'
-    if (mqtt_everest_prefix.length() > 0 && mqtt_everest_prefix.back() != '/') {
-        mqtt_everest_prefix = mqtt_everest_prefix += "/";
-    }
-
-    //
-    // Fro - set the ChargePointId as the mqtt prefix
-    //
-    const auto appinstance_mqtt_external_prefix_it = appinstance.find("NodeId");
-    if (appinstance_mqtt_external_prefix_it != appinstance.end()) {
-        mqtt_external_prefix =
-            appinstance_mqtt_external_prefix_it->get<std::string>() + "/" + defaults::MQTT_EXTERNAL_PREFIX;
-    } else {
-        EVLOG_debug << "ChargePointId missing, falling back to default mqtt-external-prefix";
-        mqtt_external_prefix = defaults::MQTT_EXTERNAL_PREFIX;
+        // create Event even though it should never be able to get here anyways
+        exit(-2);
     }
 
     if (mqtt_everest_prefix == mqtt_external_prefix) {

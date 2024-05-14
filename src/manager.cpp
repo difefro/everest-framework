@@ -2,7 +2,7 @@
 /// \file        manager.cpp
 /// \author      Felix Dilly
 /// \date        Created at: 2024-04-15
-/// \date        Last modified at: 2024-04-25
+/// \date        Last modified at: 2024-05-14
 /// ---
 /// \copyright   Copyright 2024 Fronius International GmbH.
 ///              https://www.fronius.com
@@ -49,8 +49,14 @@
 #include "controller/ipc.hpp"
 #include "system_unix.hpp"
 
+#include "../include/utils/events.h"
+#include <frostd/log/etc/lib_config.h>
+#include <frostd/log/event_logger.h>
+#include <frostd/log/lib_logging.h>
+
 namespace po = boost::program_options;
 namespace fs = std::filesystem;
+namespace frolog = frostd::log;
 
 using namespace Everest;
 
@@ -249,6 +255,8 @@ static std::map<pid_t, std::string> spawn_modules(const std::vector<ModuleStartI
         auto child_pid = proc_handle.check_child_executed();
 
         EVLOG_debug << fmt::format("Forked module {} with pid: {}", module.name, child_pid);
+        frostd::log::logger << fmt::format("Forked module {} with pid: {}", module.name, child_pid)
+                            << frostd::log::fire;
         started_modules[child_pid] = module.name;
     }
 
@@ -280,7 +288,7 @@ static std::map<pid_t, std::string> start_modules(Config& config, MQTTAbstractio
         std::string module_name = module.key();
         if (std::any_of(ignored_modules.begin(), ignored_modules.end(),
                         [module_name](const auto& element) { return element == module_name; })) {
-            EVLOG_info << fmt::format("Ignoring module: {}", module_name);
+            EVLOG_debug << fmt::format("Ignoring module: {}", module_name);
             continue;
         }
 
@@ -299,11 +307,11 @@ static std::map<pid_t, std::string> start_modules(Config& config, MQTTAbstractio
         }();
 
         if (not capabilities.empty()) {
-            EVLOG_info << fmt::format("Module {} wants to aquire the following capabilities: {}", module_name,
-                                      fmt::join(capabilities.begin(), capabilities.end(), " "));
+            EVLOG_debug << fmt::format("Module {} wants to aquire the following capabilities: {}", module_name,
+                                       fmt::join(capabilities.begin(), capabilities.end(), " "));
         }
 
-        Handler module_ready_handler = [module_name, &mqtt_abstraction, standalone_modules,
+        Handler module_ready_handler = [module_name, &mqtt_abstraction, standalone_modules, node_id = rs->node_id,
                                         mqtt_everest_prefix = rs->mqtt_everest_prefix,
                                         &status_fifo](nlohmann::json json) {
             EVLOG_debug << fmt::format("received module ready signal for module: {}({})", module_name, json.dump());
@@ -321,21 +329,23 @@ static std::map<pid_t, std::string> start_modules(Config& config, MQTTAbstractio
             }
             if (!standalone_modules.empty() && std::find(standalone_modules.begin(), standalone_modules.end(),
                                                          module_name) != standalone_modules.end()) {
-                EVLOG_info << fmt::format("Standalone module {} initialized.", module_name);
+                EVLOG_debug << fmt::format("Standalone module {} initialized.", module_name);
             }
             if (std::all_of(modules_ready.begin(), modules_ready.end(),
                             [](const auto& element) { return element.second.ready; })) {
                 auto complete_end_time = std::chrono::system_clock::now();
                 status_fifo.update(StatusFifo::ALL_MODULES_STARTED);
-                EVLOG_info << fmt::format(
+                EVLOG_debug << fmt::format(
                     TERMINAL_STYLE_OK, "🚙🚙🚙 All modules are initialized. EVerest up and running [{}ms] 🚙🚙🚙",
                     std::chrono::duration_cast<std::chrono::milliseconds>(complete_end_time - complete_start_time)
                         .count());
                 mqtt_abstraction.publish(fmt::format("{}ready", mqtt_everest_prefix), nlohmann::json(true));
+                frostd::log::eventhub << frostd::log::events::InstanceStarted{node_id} << frostd::log::fire;
+
             } else if (!standalone_modules.empty()) {
                 if (modules_spawned == modules_ready.size() - standalone_modules.size()) {
-                    EVLOG_info << fmt::format(fg(fmt::terminal_color::green),
-                                              "Modules started by manager are ready, waiting for standalone modules.");
+                    EVLOG_debug << fmt::format(fg(fmt::terminal_color::green),
+                                               "Modules started by manager are ready, waiting for standalone modules.");
                     status_fifo.update(StatusFifo::WAITING_FOR_STANDALONE_MODULES);
                 }
             }
@@ -365,7 +375,7 @@ static std::map<pid_t, std::string> start_modules(Config& config, MQTTAbstractio
 
         if (std::any_of(standalone_modules.begin(), standalone_modules.end(),
                         [module_name](const auto& element) { return element == module_name; })) {
-            EVLOG_info << fmt::format("Not starting standalone module: {}", module_name);
+            EVLOG_debug << fmt::format("Not starting standalone module: {}", module_name);
             continue;
         }
 
@@ -439,7 +449,7 @@ static void shutdown_modules(const std::map<pid_t, std::string>& modules, Config
                                           fmt::format(TERMINAL_STYLE_OK, "succeeded"));
             }
         } else {
-            EVLOG_info << fmt::format("SIGTERM of child: {} (pid: {}) {}.", child.second, child.first,
+            EVLOG_debug << fmt::format("SIGTERM of child: {} (pid: {}) {}.", child.second, child.first,
                                       fmt::format(TERMINAL_STYLE_OK, "succeeded"));
         }
     }
@@ -450,7 +460,7 @@ void signal_handler(int signum) {
 
     int stat;
     for (auto child : module_handles) {
-        EVLOG_info << "Killing child " << child.first << "\n";
+        EVLOG_debug << "Killing child " << child.first << "\n";
         kill(child.first, SIGTERM);
         waitpid(child.first, &stat, 0);
     }
@@ -524,24 +534,41 @@ int boot(const po::variables_map& vm) {
 
     Logging::init(rs->logging_config_file.string());
 
-    EVLOG_info << fmt::format(TERMINAL_STYLE_BLUE, "  ________      __                _   ");
-    EVLOG_info << fmt::format(TERMINAL_STYLE_BLUE, " |  ____\\ \\    / /               | |  ");
-    EVLOG_info << fmt::format(TERMINAL_STYLE_BLUE, " | |__   \\ \\  / /__ _ __ ___  ___| |_ ");
-    EVLOG_info << fmt::format(TERMINAL_STYLE_BLUE, " |  __|   \\ \\/ / _ \\ '__/ _ \\/ __| __|");
-    EVLOG_info << fmt::format(TERMINAL_STYLE_BLUE, " | |____   \\  /  __/ | |  __/\\__ \\ |_ ");
-    EVLOG_info << fmt::format(TERMINAL_STYLE_BLUE, " |______|   \\/ \\___|_|  \\___||___/\\__|");
-    EVLOG_info << "";
+    frostd::log::LibConfig cfg;
+    cfg.sourceInformation = {"EverestManager", rs->deployment_name, rs->app_name, rs->app_version};
+    cfg.appSubject = {rs->node_id};
+
+    // Console log
+    cfg.consoleOutput.enabled = true;
+    cfg.consoleOutput.useColor = true;
+    cfg.consoleOutput.severity = frostd::log::Severity::Trace;
+
+    // gRPC log
+    cfg.grpcOutput.address = "logevent";
+    cfg.grpcOutput.port = 8077;
+    cfg.grpcOutput.enabled = true;
+    cfg.grpcOutput.severity = frostd::log::Severity::Info;
+    cfg.grpcOutput.corkingInterval = std::chrono::seconds(1);
+    auto keepLoggingReference = frostd::log::LibLogging::init(std::move(cfg));
+
+    EVLOG_debug << fmt::format(TERMINAL_STYLE_BLUE, "  ________      __                _   ");
+    EVLOG_debug << fmt::format(TERMINAL_STYLE_BLUE, " |  ____\\ \\    / /               | |  ");
+    EVLOG_debug << fmt::format(TERMINAL_STYLE_BLUE, " | |__   \\ \\  / /__ _ __ ___  ___| |_ ");
+    EVLOG_debug << fmt::format(TERMINAL_STYLE_BLUE, " |  __|   \\ \\/ / _ \\ '__/ _ \\/ __| __|");
+    EVLOG_debug << fmt::format(TERMINAL_STYLE_BLUE, " | |____   \\  /  __/ | |  __/\\__ \\ |_ ");
+    EVLOG_debug << fmt::format(TERMINAL_STYLE_BLUE, " |______|   \\/ \\___|_|  \\___||___/\\__|");
+    EVLOG_debug << "";
 
     if (rs->mqtt_broker_socket_path.empty()) {
-        EVLOG_info << "Using MQTT broker " << rs->mqtt_broker_host << ":" << rs->mqtt_broker_port;
+        EVLOG_debug << "Using MQTT broker " << rs->mqtt_broker_host << ":" << rs->mqtt_broker_port;
     } else {
-        EVLOG_info << "Using MQTT broker unix domain sockets:" << rs->mqtt_broker_socket_path;
+        EVLOG_debug << "Using MQTT broker unix domain sockets:" << rs->mqtt_broker_socket_path;
     }
     if (rs->telemetry_enabled) {
-        EVLOG_info << "Telemetry enabled";
+        EVLOG_debug << "Telemetry enabled";
     }
     if (not rs->run_as_user.empty()) {
-        EVLOG_info << "EVerest will run as system user: " << rs->run_as_user;
+        EVLOG_debug << "EVerest will run as system user: " << rs->run_as_user;
     }
     //
     // Fro - Debug message
@@ -582,19 +609,22 @@ int boot(const po::variables_map& vm) {
         config = std::make_unique<Config>(rs, true);
     } catch (EverestInternalError& e) {
         EVLOG_error << fmt::format("Failed to load and validate config!\n{}", boost::diagnostic_information(e, true));
+        frostd::log::eventhub << frostd::log::events::LoadingConfigFailed(rs->node_id) << frostd::log::fire;
         return EXIT_FAILURE;
     } catch (boost::exception& e) {
         EVLOG_error << "Failed to load and validate config!";
         EVLOG_critical << fmt::format("Caught top level boost::exception:\n{}", boost::diagnostic_information(e, true));
+        frostd::log::eventhub << frostd::log::events::LoadingConfigFailed(rs->node_id) << frostd::log::fire;
         return EXIT_FAILURE;
     } catch (std::exception& e) {
         EVLOG_error << "Failed to load and validate config!";
         EVLOG_critical << fmt::format("Caught top level std::exception:\n{}", boost::diagnostic_information(e, true));
+        frostd::log::eventhub << frostd::log::events::LoadingConfigFailed(rs->node_id) << frostd::log::fire;
         return EXIT_FAILURE;
     }
     auto end_time = std::chrono::system_clock::now();
-    EVLOG_info << "Config loading completed in "
-               << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << "ms";
+    EVLOG_debug << "Config loading completed in "
+                << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << "ms";
 
     // dump config if requested
     if (vm.count("dump")) {
@@ -647,6 +677,9 @@ int boot(const po::variables_map& vm) {
         if (rs->mqtt_broker_socket_path.empty()) {
             EVLOG_error << fmt::format("Cannot connect to MQTT broker at {}:{}", rs->mqtt_broker_host,
                                        rs->mqtt_broker_port);
+            frostd::log::eventhub << frostd::log::events::ConnectionMqttFailed(rs->node_id, rs->mqtt_broker_host,
+                                                                               rs->mqtt_broker_port)
+                                  << frostd::log::fire;
         } else {
             EVLOG_error << fmt::format("Cannot connect to MQTT broker socket at {}", rs->mqtt_broker_socket_path);
         }
@@ -730,6 +763,8 @@ int boot(const po::variables_map& vm) {
             if (modules_started) {
                 EVLOG_critical << fmt::format("Module {} (pid: {}) exited with status: {}. Terminating all modules.",
                                               module_name, pid, wstatus);
+                frostd::log::eventhub << frostd::log::events::InstanceModuleFailed(rs->node_id, module_name, wstatus)
+                                      << frostd::log::fire;
                 shutdown_modules(module_handles, *config, mqtt_abstraction);
                 modules_started = false;
 
@@ -737,7 +772,7 @@ int boot(const po::variables_map& vm) {
                 EVLOG_critical << "Exiting manager.";
                 return EXIT_FAILURE;
             } else {
-                EVLOG_info << fmt::format("Module {} (pid: {}) exited with status: {}.", module_name, pid, wstatus);
+                EVLOG_debug << fmt::format("Module {} (pid: {}) exited with status: {}.", module_name, pid, wstatus);
             }
         }
 

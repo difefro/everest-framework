@@ -2,7 +2,7 @@
 /// \file        runtime.hpp
 /// \author      Felix Dilly
 /// \date        Created at: 2024-04-11
-/// \date        Last modified at: 2024-04-12
+/// \date        Last modified at: 2024-05-13
 /// ---
 /// \copyright   Copyright 2024 Fronius International GmbH.
 ///              https://www.fronius.com
@@ -141,6 +141,10 @@ struct RuntimeSettings {
     //
     nlohmann::json appinstance;
     std::string string_appinstance;
+    std::string node_id;
+    std::string deployment_name;
+    std::string app_name;
+    std::string app_version;
 
     json create_userconfig_from_appinstance(json appinstance_config);
     std::string parse_phase_rotation_string(json phase_rotation);
