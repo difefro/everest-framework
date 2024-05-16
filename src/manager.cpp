@@ -314,7 +314,7 @@ static std::map<pid_t, std::string> start_modules(Config& config, MQTTAbstractio
         ///
         /// Fro - add logging options for ocpp connection status
         ///
-        std::string last_ocpp_status = "fronius";
+        std::string last_ocpp_status = "foo";
         Handler ocpp_connection_handler = [&last_ocpp_status, &mqtt_abstraction, node_id = rs->node_id,
                                            mqtt_everest_prefix = rs->mqtt_external_prefix](nlohmann::json status) {
             auto connection_status = status.get<std::string>();
