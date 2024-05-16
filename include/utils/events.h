@@ -2,7 +2,7 @@
 /// \file        events.h
 /// \author      Felix Dilly
 /// \date        Created at: 2024-05-08
-/// \date        Last modified at: 2024-05-13
+/// \date        Last modified at: 2024-05-16
 /// ---
 /// \copyright   Copyright 2024 Fronius International GmbH.
 ///              https://www.fronius.com
@@ -65,6 +65,26 @@ class EverestInstanceCrashed : public Event {
 
 public:
     explicit EverestInstanceCrashed(std::string nodeid) : Event(_cfg) {
+        addSubject(SubjectInformation(nodeid));
+    }
+};
+
+class OcppConnected : public Event {
+    static inline EventConfig _cfg{"", "Instance established connection with OCPP backend.", Severity::Info,
+                                   EventGroup::Default};
+
+public:
+    explicit OcppConnected(std::string nodeid) : Event(_cfg) {
+        addSubject(SubjectInformation(nodeid));
+    }
+};
+
+class OcppNotConnected : public Event {
+    static inline EventConfig _cfg{"", "Instance has no connection to the OCPP backend.", Severity::Error,
+                                   EventGroup::Default};
+
+public:
+    explicit OcppNotConnected(std::string nodeid) : Event(_cfg) {
         addSubject(SubjectInformation(nodeid));
     }
 };

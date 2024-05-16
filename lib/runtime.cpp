@@ -2,7 +2,7 @@
 /// \file        runtime.cpp
 /// \author      Felix Dilly
 /// \date        Created at: 2024-04-11
-/// \date        Last modified at: 2024-05-14
+/// \date        Last modified at: 2024-05-16
 /// ---
 /// \copyright   Copyright 2024 Fronius International GmbH.
 ///              https://www.fronius.com
@@ -424,7 +424,7 @@ RuntimeSettings::RuntimeSettings(const std::string& prefix_, const std::string& 
     if (it_node_id != appinstance.end()) {
         node_id = it_node_id->get<std::string>();
         mqtt_everest_prefix = node_id + "/" + defaults::MQTT_EVEREST_PREFIX + "/";
-        mqtt_external_prefix = node_id + "/" + defaults::MQTT_EXTERNAL_PREFIX + "/";
+        mqtt_external_prefix = node_id + "/" + defaults::MQTT_EXTERNAL_PREFIX;
     } else {
         // create Event even though it should never be able to get here anyways
         exit(-2);

@@ -2,7 +2,7 @@
 /// \file        manager.cpp
 /// \author      Felix Dilly
 /// \date        Created at: 2024-04-15
-/// \date        Last modified at: 2024-05-14
+/// \date        Last modified at: 2024-05-16
 /// ---
 /// \copyright   Copyright 2024 Fronius International GmbH.
 ///              https://www.fronius.com
@@ -311,6 +311,29 @@ static std::map<pid_t, std::string> start_modules(Config& config, MQTTAbstractio
                                        fmt::join(capabilities.begin(), capabilities.end(), " "));
         }
 
+        ///
+        /// Fro - add logging options for ocpp connection status
+        ///
+        std::string last_ocpp_status = "fronius";
+        Handler ocpp_connection_handler = [&last_ocpp_status, &mqtt_abstraction, node_id = rs->node_id,
+                                           mqtt_everest_prefix = rs->mqtt_external_prefix](nlohmann::json status) {
+            auto connection_status = status.get<std::string>();
+            if (last_ocpp_status != connection_status) {
+
+                if ("unknown" == connection_status) {
+                    frostd::log::eventhub << frostd::log::events::OcppNotConnected{node_id} << frostd::log::fire;
+                } else if ("connected" == connection_status) {
+                    frostd::log::eventhub << frostd::log::events::OcppConnected{node_id} << frostd::log::fire;
+                }
+                last_ocpp_status = connection_status;
+            }
+        };
+        std::shared_ptr<TypedHandler> ocpp_connection = std::make_shared<TypedHandler>(
+            HandlerType::ExternalMQTT, std::make_shared<Handler>(ocpp_connection_handler));
+        mqtt_abstraction.register_handler(
+            fmt::format("{}everest_api/ocpp/var/connection_status", rs->mqtt_external_prefix), ocpp_connection,
+            QOS::QOS0);
+
         Handler module_ready_handler = [module_name, &mqtt_abstraction, standalone_modules, node_id = rs->node_id,
                                         mqtt_everest_prefix = rs->mqtt_everest_prefix,
                                         &status_fifo](nlohmann::json json) {
@@ -450,7 +473,7 @@ static void shutdown_modules(const std::map<pid_t, std::string>& modules, Config
             }
         } else {
             EVLOG_debug << fmt::format("SIGTERM of child: {} (pid: {}) {}.", child.second, child.first,
-                                      fmt::format(TERMINAL_STYLE_OK, "succeeded"));
+                                       fmt::format(TERMINAL_STYLE_OK, "succeeded"));
         }
     }
 }
@@ -573,8 +596,8 @@ int boot(const po::variables_map& vm) {
     //
     // Fro - Debug message
     //
-    EVLOG_debug << "EVerest MQTT prefix: " << rs->mqtt_everest_prefix;
-    EVLOG_debug << "External MQTT prefix: " << rs->mqtt_external_prefix;
+    frostd::log::logger << "EVerest MQTT prefix: " << rs->mqtt_everest_prefix << frostd::log::fire;
+    frostd::log::logger << "External MQTT prefix: " << rs->mqtt_external_prefix << frostd::log::fire;
 
 #ifdef ENABLE_ADMIN_PANEL
     auto controller_handle = start_controller(rs);
